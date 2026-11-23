@@ -1,0 +1,12 @@
+*
+!Dockerfile
+!requirements.txt
+!Smart_Budget_Tracker_Professional.py
+!budget_assistant.py
+!deployment_config.py
+!receipt_scanner.py
+!receipt_ui.py
+!.streamlit/
+!.streamlit/config.toml
+!assets/
+!assets/**

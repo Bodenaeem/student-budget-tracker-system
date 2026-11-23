@@ -1,0 +1,17 @@
+# Upload only the runtime source and Docker configuration.
+*
+!vercel.json
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!Smart_Budget_Tracker_Professional.py
+!budget_assistant.py
+!deployment_config.py
+!receipt_scanner.py
+!receipt_ui.py
+!.streamlit/
+!.streamlit/config.toml
+!assets/
+!assets/glass-theme.css
+!assets/graphite-texture.png
+!assets/theme-sync.html

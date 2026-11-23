@@ -4,7 +4,7 @@ A personal finance application built with Python and Streamlit. Record income an
 
 The application stores records in a local SQLite database and includes a rule-based budget assistant that runs without an external AI service or API key.
 
-**Project status:** working personal/demo application. The interface identifies the app as v2.0. Authentication uses a shared demo account; the application does not currently provide separate user accounts or data isolation.
+**Project status:** working personal/demo application. The interface identifies the app as v2.0. Local use defaults to a demo account; hosted mode requires a private owner login and an explicit database path. The application does not currently provide separate user accounts or data isolation.
 
 ## Features
 
@@ -81,7 +81,57 @@ Open the local address printed in the terminal, normally `http://localhost:8501`
 | Username | `admin` |
 | Password | `admin123` |
 
-These credentials are hardcoded and also shown on the login screen. Use this setup for a local demonstration; shared deployment requires an authentication and data-isolation design.
+These demo credentials appear only when no owner credentials are configured in local mode. Hosted mode requires private credentials. This remains a single-owner application; multiple independent users require a separate authentication and data-isolation design.
+
+## Deployment preparation
+
+Deployment files are prepared; their presence does not mean the application is live. The Docker image runs Python 3.12, includes Tesseract and English OCR data, and uses the Kuala Lumpur timezone. It binds to `0.0.0.0` and the host's `PORT` (default `8501`). A host can check `/_stcore/health` for server readiness; also verify that the login page has no configuration error before considering deployment successful.
+
+### Deploy on Vercel
+
+`vercel.json` selects Vercel's **Container** framework and builds the root `Dockerfile`. This runs the existing Streamlit server and removes the Python entrypoint discovery step that produced `PYTHON_ENTRYPOINT_NOT_FOUND`. Vercel documents its Container runtime at https://vercel.com/docs/functions/runtimes/container.
+
+1. Commit the full source to the connected GitHub repository, including `vercel.json`, `Dockerfile`, `.dockerignore`, `.vercelignore`, `deployment_config.py`, `.streamlit/config.toml`, and the `assets/` directory. Uploading only the top-level Python files omits required modules and theme assets. The archive `deployment-source.zip`, when provided, contains these files: extract it before uploading, preserving the directory structure and hidden files.
+2. Use the repository root as the Vercel **Root Directory**. `vercel.json` overrides the framework to **Container** and resets build, installation, and output directory overrides to their framework defaults. If the dashboard still shows Python, select **Container** under **Settings → Build and Deployment**.
+3. In Vercel's environment variable settings, add `BUDGET_USERNAME` and a unique `BUDGET_PASSWORD` of at least 12 characters for the deployment environment. Keep both values out of source control.
+4. Deploy the commit containing these changes, without reusing the previous build cache. Redeploying an older commit will still use the Python preset. Check that the logs build the Dockerfile rather than search for `app.py`.
+5. Open the deployment and sign in. The configuration sets `PORT=8501`, matching Streamlit's port, and uses a writable `/tmp/smart_budget_tracker.db` for a fresh test database. Your existing local records are not uploaded.
+
+**Vercel storage limitation:** this configuration is for testing. The container's local SQLite database is temporary and is not shared between instances. Records can disappear on restart, scale-down, or redeployment, and connections may reconnect to a different instance. The app displays a temporary-storage warning. An external persistent database integration is required before using this Vercel deployment for real records; setting an absolute path does not provide persistence. The Render disk setup below supports the current SQLite implementation for persistent use.
+
+`.vercelignore` limits CLI uploads to runtime files, and `.dockerignore` limits the image build context. These rules do not remove database files that were already committed to GitHub.
+
+### Deploy on Render
+
+The root `render.yaml` configures a Docker web service, the Streamlit health check, a single instance, and a 1 GB persistent disk mounted at `/var/data`. It selects the paid `0.5c-512mb` compute plan; review the service and disk charges in Render before deploying.
+
+1. Add the project source, including `render.yaml`, `Dockerfile`, `.dockerignore`, `.streamlit/config.toml`, and `assets/`, to your GitHub repository. Do not upload your local database or secrets.
+2. In Render, choose **New → Blueprint**, connect the repository, and use the root `render.yaml`.
+3. Enter a private `BUDGET_USERNAME` and a unique `BUDGET_PASSWORD` of at least 12 characters when prompted. These values are supplied through Render, not committed to the repository.
+4. Review the plan and disk, then deploy. The Dockerfile supplies the start command; no build command or start command override is needed.
+5. Open the deployed URL, confirm the login form renders without errors, and sign in. Save a test record, restart the service, and confirm that record persists before entering real records.
+
+For an existing Render service, configure its runtime as Docker, attach the disk at `/var/data`, and set the environment variables below. Adding `sync: false` variables to an existing Blueprint does not prompt again; set credentials in the service's Environment settings.
+
+The current app is a Streamlit script launched by `streamlit run`, not an ASGI/WSGI handler for Vercel's Python runtime. Renaming it to `app.py` or setting `tool.vercel.entrypoint` alone will not make it compatible. The Vercel configuration above uses the Container runtime to start Streamlit through Docker.
+
+### Hosted settings
+
+Set these values in the hosting provider's environment/secret settings:
+
+| Setting | Value |
+| --- | --- |
+| `BUDGET_DEPLOYMENT` | `production` (already set in the Docker image) |
+| `BUDGET_USERNAME` | Your private owner username |
+| `BUDGET_PASSWORD` | A unique password of at least 12 characters; store as a secret |
+| `BUDGET_DB_PATH` | `/var/data/smart_budget_tracker.db` (Docker default) |
+| `TZ` | `Asia/Kuala_Lumpur` (Docker default) |
+
+Attach a **persistent disk at `/var/data`** before entering records. An absolute database path alone does not make storage persistent. For Render, choose Docker as the runtime, use the repository's Dockerfile, and attach the disk to a paid web service. Render's free web service cannot attach a persistent disk. Review billing before provisioning. Streamlit Community Cloud needs an external persistent database for reliable financial storage; this version still uses SQLite and is not configured for an external database.
+
+Without valid hosted credentials or an absolute database path, the application stops before presenting the login form. Hosted mode hides the demo credentials and rejects the local demo login. Setting both owner credentials also enables a private login locally. Hosted mode is selected by `BUDGET_DEPLOYMENT=production`, Render's `RENDER=true`, or `RAILWAY_PROJECT_ID`.
+
+Upload source and assets only. `.gitignore` excludes databases and secrets, and the Docker build uses an explicit source allowlist. Your existing local records are **not automatically migrated**. The first hosted login creates an empty database on the persistent disk; moving existing records requires a separate backup and restore. Use the app's CSV exports and the host's disk backups for ongoing recovery.
 
 ## Suggested first use
 
@@ -163,6 +213,11 @@ Arithmetic accepts numbers, percentages, `+`, `-`, `*`, `/`, parentheses, and th
 ├── receipt_ui.py                       # Upload and editable confirmation workflow
 ├── receipt_ocr.swift                   # Local macOS Apple Vision helper
 ├── requirements.txt                    # Python dependency pins
+├── Dockerfile                          # Streamlit server and Linux OCR runtime
+├── vercel.json                         # Container framework, port, and temporary test storage
+├── .vercelignore                       # Vercel CLI upload allowlist
+├── render.yaml                         # Render service, persistent disk, and secret prompts
+├── deployment_config.py                # Hosted credentials and database path validation
 ├── packages.txt                        # Linux OCR packages for Streamlit Cloud
 ├── smart_budget_tracker.db              # Local financial records
 ├── README.md                           # Setup and usage guide
@@ -183,19 +238,19 @@ Arithmetic accepts numbers, percentages, `+`, `-`, `*`, `/`, parentheses, and th
 
 ## Storage and backups
 
-The app opens `smart_budget_tracker.db` beside the Python file. If the database is missing, it creates the database and its tables after a successful login. The project directory must be writable.
+By default, the app opens `smart_budget_tracker.db` beside the Python file. `BUDGET_DB_PATH` overrides that location for hosting. If the database is missing, it creates the database and its tables after a successful login. The selected storage directory must be writable.
 
 The database contains three application tables: `transactions`, `budgets`, and `savings_goals`. There is no user table or built-in database encryption. When hosted, “local storage” means storage on the server running Streamlit.
 
 To back up records, stop the application and copy `smart_budget_tracker.db` to a safe location. To restore, stop the application, preserve a copy of the current database, replace it with the backup under the same filename, and restart. CSV downloads are useful for analysis, but the app has no CSV import or automated restore feature.
 
-The database is not currently excluded by `.gitignore`. Check that real financial records are excluded before sharing or publishing the project.
+Database files and local secrets are excluded by `.gitignore` and the Docker build. Keep backups outside the source repository too.
 
 ## Known limitations
 
 | Area | Current limitation |
 | --- | --- |
-| Authentication | One shared demo login; no registration, password management, or user-specific records. |
+| Authentication | One owner login configured through hosting secrets, with demo fallback only in local mode; no registration, password management, or user-specific records. |
 | Assistant language | Local rules handle supported topics, rather than unrestricted language understanding. Use explicit amounts and units, and rephrase if asked. |
 | Goal deadlines | Enabling the deadline checkbox inside the form can save today's date before the user can select their intended date. |
 | Goal deletion | Clicking Delete Goal immediately removes the record without confirmation or undo. |

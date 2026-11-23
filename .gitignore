@@ -1,0 +1,19 @@
+node_modules/
+.tools/
+.npm-cache/
+__pycache__/
+*.pyc
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.venv/
+venv/
+.DS_Store
+deployment-source.zip
+
+# Keep frontend/dist/index.html: Streamlit runs this build without Node.
