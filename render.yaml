@@ -1,0 +1,26 @@
+# Deploy with Render: New > Blueprint, then select this repository.
+# This configuration provisions a paid web service and a 1 GB persistent disk.
+services:
+  - type: web
+    name: smart-budget-tracker
+    runtime: docker
+    plan: 0.5c-512mb
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /_stcore/health
+    numInstances: 1
+    disk:
+      name: budget-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: BUDGET_DEPLOYMENT
+        value: production
+      - key: BUDGET_DB_PATH
+        value: /var/data/smart_budget_tracker.db
+      - key: TZ
+        value: Asia/Kuala_Lumpur
+      - key: BUDGET_USERNAME
+        sync: false
+      - key: BUDGET_PASSWORD
+        sync: false
