@@ -70,6 +70,9 @@ except ValueError as exc:
     st.error(str(exc))
     st.stop()
 
+if settings.ephemeral_storage:
+    st.warning("This deployment uses temporary storage. Records may disappear when the server restarts or scales. Use it only for testing.")
+
 if not st.session_state.logged_in:
 
     st.markdown(

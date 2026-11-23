@@ -1,0 +1,45 @@
+<script>
+(() => {
+    // Streamlit owns the theme preference and persists it. Mirror its rendered
+    // color scheme so our CSS and portalled dialogs use that same preference.
+    const host = window.parent;
+    const doc = host.document;
+    const slot = "__budgetThemeSync";
+    host[slot]?.dispose();
+    let app;
+    let frame;
+    const media = host.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => {
+        const renderedApp = doc.querySelector('[data-testid="stApp"]');
+        if (!renderedApp) return;
+        if (renderedApp !== app) {
+            observer.disconnect();
+            app = renderedApp;
+            observer.observe(app, {attributes: true, attributeFilter: ["class", "style"]});
+        }
+        const scheme = host.getComputedStyle(app).colorScheme === "dark" ? "dark" : "light";
+        if (doc.documentElement.dataset.budgetTheme !== scheme) {
+            doc.documentElement.dataset.budgetTheme = scheme;
+        }
+    };
+    const schedule = () => {
+        host.cancelAnimationFrame(frame);
+        frame = host.requestAnimationFrame(sync);
+    };
+    const observer = new host.MutationObserver(schedule);
+    const treeObserver = new host.MutationObserver(() => {
+        if (!app?.isConnected) schedule();
+    });
+    treeObserver.observe(doc.getElementById("root"), {childList: true, subtree: true});
+    media.addEventListener("change", schedule);
+    host[slot] = {
+        dispose() {
+            observer.disconnect();
+            treeObserver.disconnect();
+            media.removeEventListener("change", schedule);
+            host.cancelAnimationFrame(frame);
+        }
+    };
+    sync();
+})();
+</script>
